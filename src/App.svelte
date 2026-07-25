@@ -1,46 +1,91 @@
 <script lang="ts">
-  import svelteLogo from "./assets/svelte.svg";
-  import viteLogo from "./assets/vite.svg";
-  import heroImg from "./assets/hero.png";
-  import Counter from "./lib/Counter.svelte";
-  import { supabase } from "./supabaseClient";
   import { onMount } from "svelte";
-  import type { BillItem } from "./bill.types";
+  import type { BillSession, Payer } from "./bill.types";
+  import { fetchBillSession, fetchPayers } from "./utils";
+  import JoinPage from "./lib/JoinPage.svelte";
+  import BillPreviewPage from "./lib/BillPreviewPage.svelte";
+  import ClaimItemsPage from "./lib/ClaimItemsPage.svelte";
+  import Logo from "./lib/Logo.svelte";
 
-  let billItems: BillItem[] = $state([]);
-  let index = $state(0);
-  let item = $derived(billItems[index]);
+  let billSession: BillSession | undefined = $state();
+  let payers: Payer[] = $state([]);
+  let selectedPayerIds: string[] = $state([]);
+  let hasSelectedPayers: boolean = $derived(selectedPayerIds.length > 0);
 
   onMount(async () => {
-    const { data, error, status } = await supabase
-      .from("bill_sessions")
-      .select()
-      .single();
+    const bs = await fetchBillSession();
+    if (!bs) return;
+    billSession = bs;
+    payers = await fetchPayers(billSession.id);
 
-    if (error) throw error;
-    if (status !== 200) return;
-    if (!data || !data.items) return;
+    const selectedPayerIdsCsv = localStorage.getItem("selected_payer_ids");
+    const selectedPayerIdsList = selectedPayerIdsCsv?.split(",");
 
-    billItems = data.items as BillItem[];
+    if (!selectedPayerIdsList) return;
+
+    for (const id of selectedPayerIdsList) {
+      const sid = id.trim();
+      if (payers.filter((payer) => payer.id === sid).length === 0) {
+        console.log("Could not find payer id in list of payers", sid);
+        continue;
+      }
+      selectedPayerIds.push(sid);
+    }
+
+    console.log(selectedPayerIds);
   });
 
-  const increaseIndex = () => {
-    index = (index + 1) % billItems.length;
+  const submitSelectedPayers = (selectedPayerIdsArray: string[]) => {
+    const selectedPayerIdsCsv = selectedPayerIdsArray.join(",");
+    localStorage.setItem("selected_payer_ids", selectedPayerIdsCsv);
+    selectedPayerIds = selectedPayerIdsArray;
   };
 </script>
 
-<section id="center">
-  <div class="hero">
-    <img src={heroImg} class="base" width="170" height="179" alt="" />
-    <img src={svelteLogo} class="framework" alt="Svelte logo" />
-    <img src={viteLogo} class="vite" alt="Vite logo" />
+{#if !billSession}
+  <div class="join">
+    <Logo />
+    <JoinPage />
   </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/App.svelte</code> and save to test <code>HMR</code></p>
+{/if}
+
+{#if billSession && !hasSelectedPayers}
+  <div class="bill-preview">
+    <Logo />
+    <BillPreviewPage
+      {billSession}
+      {payers}
+      onSubmitSelectedPayers={submitSelectedPayers}
+    />
   </div>
-  <Counter increment={increaseIndex} {index} max={billItems.length} />
-  {#if item}
-    <p>{item.name} - £{item.unit_price / 100} (x{item.quantity})</p>
-  {/if}
-</section>
+{/if}
+
+{#if billSession && hasSelectedPayers}
+  <div class="claim-items">
+    <Logo />
+    <ClaimItemsPage
+      payers={payers.filter((payer) => selectedPayerIds.includes(payer.id))}
+    />
+  </div>
+{/if}
+
+<style>
+  div {
+    display: flex;
+    box-sizing: border-box;
+    height: 100dvh;
+    flex-direction: column;
+  }
+
+  .join {
+    background-color: var(--bg-pastel-red);
+  }
+
+  .bill-preview {
+    background-color: var(--bg-pastel-blue);
+  }
+
+  .claim-items {
+    background-color: var(--bg-pastel-red);
+  }
+</style>

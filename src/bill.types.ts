@@ -1,6 +1,7 @@
 export type BillSession = {
     id: string;
     host_id: string;
+    name: string;
     status: "open" | "locked" | "closed";
     session_token: string;
     items: BillItem[];
@@ -13,4 +14,9 @@ export type BillItem = {
     name: string;
     unit_price: number;
     quantity: number;
+}
+
+export type Payer = {
+    id: string;
+    name: string;
 }

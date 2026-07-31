@@ -1,4 +1,4 @@
-import type { BillItem, BillSession, Payer } from "./bill.types";
+import type { BillItem, BillSession, Payer } from "./lib/types/bill.types";
 import { supabase } from "./supabaseClient";
 
 export const fetchBillSession = async (): Promise<BillSession | undefined> => {
